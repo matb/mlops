@@ -1,0 +1,24 @@
+# Exercise 1
+apache-airflow==2.6.1
+# Exercise 2
+kfp==1.8.21
+pandas==2.0.1
+scikit-learn==1.2.2
+joblib==1.2.0
+tensorflow-decision-forests==1.3.0
+# Exercise 3
+dill==0.3.6
+skl2onnx==1.14.0
+onnx==1.13.1
+sklearn2pmml==0.92.2
+onnxmltools==1.11.2
+# Exercise 4
+onnxruntime==1.15.0
+# Exercise 6
+evidently==0.3.1
+fastapi==0.95.2
+requests==2.30.0
+uvicorn==0.22.0
+starlette_prometheus==0.9.0
+loguru==0.7.0
+pendulum==2.1.2

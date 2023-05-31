@@ -1,0 +1,33 @@
+version: '3.7'
+
+services:
+  tf_service_1:
+    image: tensorflow/serving:2.11.0
+    container_name: tf_service_1
+    volumes:
+      - ./model1/:/models/
+    ports:
+      - "8500:8500"
+      - "8501:8501"
+    command:
+      - '--model_config_file=/models/models.config'
+      - '--allow_version_labels_for_unavailable_models=true'
+      - '--model_config_file_poll_wait_seconds=60'
+      - '--rest_api_port=8501'
+    networks:
+      - default_network
+
+  nginx:
+    image: nginx
+    container_name: nginx
+    ports:
+      - "8505:80"
+      - "443:443"
+    networks:
+      - default_network
+
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+networks:
+  default_network:
+    name: default_network

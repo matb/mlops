@@ -1,0 +1,220 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: conditional-execution-pipeline-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.21, pipelines.kubeflow.org/pipeline_compilation_time: '2023-05-17T14:54:00.014806',
+    pipelines.kubeflow.org/pipeline_spec: '{"description": "Shows how to use dsl.Condition().",
+      "name": "Conditional execution pipeline"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.21}
+spec:
+  entrypoint: conditional-execution-pipeline
+  templates:
+  - name: conditional-execution-pipeline
+    dag:
+      tasks:
+      - {name: download-data, template: download-data}
+      - name: train
+        template: train
+        dependencies: [download-data]
+        arguments:
+          artifacts:
+          - {name: download-data-features, from: '{{tasks.download-data.outputs.artifacts.download-data-features}}'}
+          - {name: download-data-target, from: '{{tasks.download-data.outputs.artifacts.download-data-target}}'}
+  - name: download-data
+    container:
+      args: [--features, /tmp/outputs/features/data, --target, /tmp/outputs/target/data,
+        '----output-paths', /tmp/outputs/features_2/data, /tmp/outputs/target_2/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'scikit-learn' 'pandas' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip
+        install --quiet --no-warn-script-location 'scikit-learn' 'pandas' --user)
+        && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def download_data(features, target):
+            from collections import namedtuple
+            from sklearn import datasets
+            import pandas as pd
+
+            iris = datasets.load_iris()
+            pd.DataFrame(iris.data).to_csv(features, header=False, index=False)
+            pd.DataFrame(iris.target).to_csv(target, header=False, index=False)
+            return namedtuple('output', ['features', 'target'])(features, target)
+
+        def _serialize_str(str_value: str) -> str:
+            if not isinstance(str_value, str):
+                raise TypeError('Value "{}" has type "{}" instead of str.'.format(
+                    str(str_value), str(type(str_value))))
+            return str_value
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Download data', description='')
+        _parser.add_argument("--features", dest="features", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--target", dest="target", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=2)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = download_data(**_parsed_args)
+
+        _output_serializers = [
+            _serialize_str,
+            _serialize_str,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: python:3.7
+    outputs:
+      artifacts:
+      - {name: download-data-features, path: /tmp/outputs/features/data}
+      - {name: download-data-features_2, path: /tmp/outputs/features_2/data}
+      - {name: download-data-target, path: /tmp/outputs/target/data}
+      - {name: download-data-target_2, path: /tmp/outputs/target_2/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.21
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--features", {"outputPath": "features"}, "--target", {"outputPath":
+          "target"}, "----output-paths", {"outputPath": "features_2"}, {"outputPath":
+          "target_2"}], "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1
+          python3 -m pip install --quiet --no-warn-script-location ''scikit-learn''
+          ''pandas'' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet
+          --no-warn-script-location ''scikit-learn'' ''pandas'' --user) && \"$0\"
+          \"$@\"", "sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
+          -u \"$program_path\" \"$@\"\n", "def _make_parent_dirs_and_return_path(file_path:
+          str):\n    import os\n    os.makedirs(os.path.dirname(file_path), exist_ok=True)\n    return
+          file_path\n\ndef download_data(features, target):\n    from collections
+          import namedtuple\n    from sklearn import datasets\n    import pandas as
+          pd\n\n    iris = datasets.load_iris()\n    pd.DataFrame(iris.data).to_csv(features,
+          header=False, index=False)\n    pd.DataFrame(iris.target).to_csv(target,
+          header=False, index=False)\n    return namedtuple(''output'', [''features'',
+          ''target''])(features, target)\n\ndef _serialize_str(str_value: str) ->
+          str:\n    if not isinstance(str_value, str):\n        raise TypeError(''Value
+          \"{}\" has type \"{}\" instead of str.''.format(\n            str(str_value),
+          str(type(str_value))))\n    return str_value\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Download data'', description='''')\n_parser.add_argument(\"--features\",
+          dest=\"features\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parser.add_argument(\"--target\", dest=\"target\",
+          type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=2)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = download_data(**_parsed_args)\n\n_output_serializers
+          = [\n    _serialize_str,\n    _serialize_str,\n\n]\n\nimport os\nfor idx,
+          output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "python:3.7"}}, "name": "Download data", "outputs": [{"name": "features",
+          "type": "String"}, {"name": "target", "type": "String"}, {"name": "features_2",
+          "type": "String"}, {"name": "target_2", "type": "String"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  - name: train
+    container:
+      args: [--features, /tmp/inputs/features/data, --target, /tmp/inputs/target/data,
+        --model-out, /tmp/outputs/model_out/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'pandas' 'scikit-learn' 'tensorflow' 'joblib' || PIP_DISABLE_PIP_VERSION_CHECK=1
+        python3 -m pip install --quiet --no-warn-script-location 'pandas' 'scikit-learn'
+        'tensorflow' 'joblib' --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - "def _make_parent_dirs_and_return_path(file_path: str):\n    import os\n \
+        \   os.makedirs(os.path.dirname(file_path), exist_ok=True)\n    return file_path\n\
+        \ndef train(\n    features,\n    target,\n    model_out,\n):\n    import json\
+        \ \n    import pandas as pd\n    import joblib\n    from sklearn.model_selection\
+        \ import train_test_split\n    import tensorflow as tf\n\n    features = pd.read_csv(features)\n\
+        \    target = pd.read_csv(target)\n\n    features_train, features_test, labels_train,\
+        \ labels_test = train_test_split(\n        features.values, target.values,\
+        \ test_size=0.2, random_state=42\n    )\n\n    model = tf.keras.Sequential([\n\
+        \        tf.keras.layers.Dense(10, activation='relu', input_shape=(4,)),\n\
+        \        tf.keras.layers.Dense(10, activation='relu'),\n        tf.keras.layers.Dense(3,\
+        \ activation='softmax')\n    ])\n\n    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy',\
+        \ metrics=['accuracy'])\n    model.fit(features_train, labels_train, epochs=100,\
+        \ batch_size=32)\n\n    loss, accuracy = model.evaluate(features_test, labels_test)\n\
+        \    print(f'Test loss: {loss}')\n    print(f'Test accuracy: {accuracy}')\n\
+        \    # Step 6: Save the trained model\n    model.save(f'models/iris/latest')\n\
+        \    print(\"Model saved successfully!\")\n    joblib.dump(model, model_out)\n\
+        \    metrics = {\n        \"metrics\": [\n            {\n                \"\
+        name\": \"accuracy-score\",\n                \"numberValue\": accuracy,\n\
+        \                \"format\": \"PERCENTAGE\",\n            }\n        ]\n \
+        \   }\n    return [json.dumps(metrics)]\n\nimport argparse\n_parser = argparse.ArgumentParser(prog='Train',\
+        \ description='')\n_parser.add_argument(\"--features\", dest=\"features\"\
+        , type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"\
+        --target\", dest=\"target\", type=str, required=True, default=argparse.SUPPRESS)\n\
+        _parser.add_argument(\"--model-out\", dest=\"model_out\", type=_make_parent_dirs_and_return_path,\
+        \ required=True, default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\
+        \n_outputs = train(**_parsed_args)\n"
+      image: python:3.7
+    inputs:
+      artifacts:
+      - {name: download-data-features, path: /tmp/inputs/features/data}
+      - {name: download-data-target, path: /tmp/inputs/target/data}
+    outputs:
+      artifacts:
+      - {name: train-model_out, path: /tmp/outputs/model_out/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.21
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"implementation": {"container":
+          {"args": ["--features", {"inputPath": "features"}, "--target", {"inputPath":
+          "target"}, "--model-out", {"outputPath": "model_out"}], "command": ["sh",
+          "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+          ''pandas'' ''scikit-learn'' ''tensorflow'' ''joblib'' || PIP_DISABLE_PIP_VERSION_CHECK=1
+          python3 -m pip install --quiet --no-warn-script-location ''pandas'' ''scikit-learn''
+          ''tensorflow'' ''joblib'' --user) && \"$0\" \"$@\"", "sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def _make_parent_dirs_and_return_path(file_path: str):\n    import os\n    os.makedirs(os.path.dirname(file_path),
+          exist_ok=True)\n    return file_path\n\ndef train(\n    features,\n    target,\n    model_out,\n):\n    import
+          json \n    import pandas as pd\n    import joblib\n    from sklearn.model_selection
+          import train_test_split\n    import tensorflow as tf\n\n    features = pd.read_csv(features)\n    target
+          = pd.read_csv(target)\n\n    features_train, features_test, labels_train,
+          labels_test = train_test_split(\n        features.values, target.values,
+          test_size=0.2, random_state=42\n    )\n\n    model = tf.keras.Sequential([\n        tf.keras.layers.Dense(10,
+          activation=''relu'', input_shape=(4,)),\n        tf.keras.layers.Dense(10,
+          activation=''relu''),\n        tf.keras.layers.Dense(3, activation=''softmax'')\n    ])\n\n    model.compile(optimizer=''adam'',
+          loss=''sparse_categorical_crossentropy'', metrics=[''accuracy''])\n    model.fit(features_train,
+          labels_train, epochs=100, batch_size=32)\n\n    loss, accuracy = model.evaluate(features_test,
+          labels_test)\n    print(f''Test loss: {loss}'')\n    print(f''Test accuracy:
+          {accuracy}'')\n    # Step 6: Save the trained model\n    model.save(f''models/iris/latest'')\n    print(\"Model
+          saved successfully!\")\n    joblib.dump(model, model_out)\n    metrics =
+          {\n        \"metrics\": [\n            {\n                \"name\": \"accuracy-score\",\n                \"numberValue\":
+          accuracy,\n                \"format\": \"PERCENTAGE\",\n            }\n        ]\n    }\n    return
+          [json.dumps(metrics)]\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Train'',
+          description='''')\n_parser.add_argument(\"--features\", dest=\"features\",
+          type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--target\",
+          dest=\"target\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--model-out\",
+          dest=\"model_out\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = train(**_parsed_args)\n"], "image": "python:3.7"}}, "inputs": [{"name":
+          "features"}, {"name": "target"}], "name": "Train", "outputs": [{"name":
+          "model_out"}]}', pipelines.kubeflow.org/component_ref: '{}'}
+  arguments:
+    parameters: []
+  serviceAccountName: pipeline-runner
